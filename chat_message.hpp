@@ -78,6 +78,18 @@ public:
         return message;
     }
 
+    std::string get_recipient() {
+        std::string data_str(data_);
+        data_str = data_str.substr(chat_message::HEADER_SIZE * 2, body_length_);
+        int pos = (data_str).find('{');
+        std::string json = data_str.substr(pos);
+
+        std::istringstream is(json);
+        pt::read_json(is, root);
+        recipient = root.get<std::string>("Header.To");
+        return recipient;
+    }
+
     void read_json() {
         std::istringstream is(data_);
         pt::read_json(is, root);
@@ -98,6 +110,10 @@ public:
         return true;
     }
 
+    std::string get_username() {
+
+    }
+
     void create_tree(const std::string& receiver, const std::string& deliverer,
                      const std::string& body ="") {
         root.put("Header.To", receiver);
@@ -110,7 +126,7 @@ private:
     std::size_t body_length_{};
     enum { MAXIMUM_MESSAGE_SIZE = 700 };
     pt::ptree root;
-    std::string username;
+    std::string recipient;
     char data_[MAXIMUM_MESSAGE_SIZE + 4]{};
 };
 

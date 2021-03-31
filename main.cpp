@@ -16,6 +16,7 @@
 #include <set>
 #include <utility>
 #include <boost/asio.hpp>
+#include <unordered_map>
 #include "chat_message.hpp"
 
 using boost::asio::ip::tcp;
@@ -29,8 +30,8 @@ typedef std::deque<chat_message> chat_message_queue;
 class chat_participant
 {
 public:
-    virtual ~chat_participant() {}
-    virtual void deliver(const chat_message& msg) = 0;
+    virtual ~chat_participant() = default;
+    virtual void deliver(const std::string& recipient, const chat_message& msg) = 0;
 };
 
 typedef std::shared_ptr<chat_participant> chat_participant_ptr;
@@ -40,30 +41,41 @@ typedef std::shared_ptr<chat_participant> chat_participant_ptr;
 class chat_room
 {
 public:
-    void join(const chat_participant_ptr& participant)
+    void join(const std::string& username, const chat_participant_ptr& participant)
     {
-        participants_.insert(participant);
-        for (auto msg: recent_msgs_)
-            participant->deliver(msg);
+        participants_.emplace(username, participant);
+        //for (const auto& msg: recent_msgs_)
+        //    participant->deliver(msg);
     }
 
     void leave(const chat_participant_ptr& participant)
     {
-        participants_.erase(participant);
+        for (auto it = participants_.begin(); it != participants_.end(); )
+        {
+            if (it->second == participant) {
+                participants_.erase(it++);
+            }
+            else {
+                ++it;
+            }
+        }
+
     }
 
-    void deliver(const chat_message& msg)
+    void deliver(const std::string& recipient, const chat_message& msg)
     {
-        recent_msgs_.push_back(msg);
-        while (recent_msgs_.size() > max_recent_msgs)
-            recent_msgs_.pop_front();
+        if (participants_.find(recipient) != participants_.end()) {
+            recent_msgs_.push_back(msg);
+            while (recent_msgs_.size() > max_recent_msgs)
+                recent_msgs_.pop_front();
 
-        for (const auto& participant: participants_)
-            participant->deliver(msg);
+            auto it = participants_.find(recipient);
+            it->second->deliver(recipient, msg);
+        }
     }
 
 private:
-    std::set<chat_participant_ptr> participants_;
+    std::unordered_map<std::string, chat_participant_ptr> participants_;
     enum { max_recent_msgs = 100 };
     chat_message_queue recent_msgs_;
 };
@@ -84,11 +96,11 @@ public:
     void start()
     {
         read_username();
-        room_.join(shared_from_this());
         do_read_header();
+
     }
 
-    void deliver(const chat_message& msg) override
+    void deliver(const std::string& recipient, const chat_message& msg) override
     {
         bool write_in_progress = !write_msgs_.empty();
         write_msgs_.push_back(msg);
@@ -109,10 +121,14 @@ public:
 
     void handle_username(boost::system::error_code ec, std::size_t size) {
         std::stringstream message;
-        message << socket_.remote_endpoint(ec) << "> " << std::istream(&buf).rdbuf();
+        //message << socket_.remote_endpoint(ec) << "> " << std::istream(&buf).rdbuf();
+        message << std::istream(&buf).rdbuf();
         buf.consume(size);
         std::cout << message.str();
-        username = message.str();
+        std::string username = message.str();
+        int pos = username.find('\n');
+        username = username.substr(0,pos);
+        room_.join(username, shared_from_this());
     }
 
 private:
@@ -143,7 +159,9 @@ private:
                                 {
                                     if (!ec)
                                     {
-                                        room_.deliver(read_msg_);
+
+                                        std::string receiver = read_msg_.get_recipient();
+                                        room_.deliver(receiver, read_msg_);
                                         do_read_header();
                                     }
                                     else
@@ -183,7 +201,6 @@ private:
     chat_message read_msg_;
     chat_message_queue write_msgs_;
     boost::asio::streambuf buf;
-    std::string username;
 };
 
 //----------------------------------------------------------------------
