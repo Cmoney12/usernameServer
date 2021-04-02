@@ -5,6 +5,9 @@
 #include <iostream>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
+#include "rapidjson/document.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
 
 #ifndef BOOSTWRITEJSON_CHAT_MESSAGE_HPP
 #define BOOSTWRITEJSON_CHAT_MESSAGE_HPP
@@ -61,7 +64,7 @@ public:
     }
 
 
-    std::string write_json() {
+    /**std::string write_json() {
         std::ostringstream oss;
         std::string message;
         pt::write_json(oss, root);
@@ -76,16 +79,39 @@ public:
             }
         }
         return message;
+    }**/
+
+    std::string get_username() {
+        std::string data_str(data_);
+        int pos = (data_str).find('{');
+        std::string json = data_str.substr(pos, body_length_);
+        std::string username;
+
+        rapidjson::Document json_doc;
+        json_doc.Parse(json.c_str());
+        rapidjson::Value& header = json_doc["Header"];
+        rapidjson::Value::ConstMemberIterator itr = header.FindMember("To");
+
+// assuming "command" is a String value
+        if (itr != header.MemberEnd())
+            printf("command = %s\n", itr->value.GetString());
+
+        //rapidjson::Value::ConstMemberIterator itr = json_doc.FindMember("hello");
+        //if (itr != json_doc.MemberEnd())
+        //     username = itr->value.GetString();
+        return username;
     }
 
     std::string get_recipient() {
         std::string data_str(data_);
-        data_str = data_str.substr(chat_message::HEADER_SIZE * 2, body_length_);
+        //data_str = data_str.substr(chat_message::HEADER_SIZE * 2, body_length_);
         int pos = (data_str).find('{');
-        std::string json = data_str.substr(pos);
+        std::string json = data_str.substr(pos, body_length_);
+        std::cout << json << std::endl;
 
         std::istringstream is(json);
         pt::read_json(is, root);
+        is.clear();
         recipient = root.get<std::string>("Header.To");
         return recipient;
     }
@@ -108,10 +134,6 @@ public:
             return false;
         }
         return true;
-    }
-
-    std::string get_username() {
-
     }
 
     void create_tree(const std::string& receiver, const std::string& deliverer,

@@ -119,7 +119,7 @@ public:
         });
     }
 
-    void handle_username(boost::system::error_code ec, std::size_t size) {
+    void handle_username(boost::system::error_code, std::size_t size) {
         std::stringstream message;
         //message << socket_.remote_endpoint(ec) << "> " << std::istream(&buf).rdbuf();
         message << std::istream(&buf).rdbuf();
@@ -159,7 +159,7 @@ private:
                                 {
                                     if (!ec)
                                     {
-
+                                        std::string test = read_msg_.get_username();
                                         std::string receiver = read_msg_.get_recipient();
                                         room_.deliver(receiver, read_msg_);
                                         do_read_header();
