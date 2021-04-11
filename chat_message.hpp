@@ -61,7 +61,7 @@ public:
         //json_doc.Parse(json.c_str());
         rapidjson::Value& head = json_doc["Header"];
         head.IsObject();
-        rapidjson::Value::ConstMemberIterator itr = head.FindMember("To");
+        rapidjson::Value::ConstMemberIterator itr = head.FindMember("From");
         if (itr != head.MemberEnd())
             username = itr->value.GetString();
 
