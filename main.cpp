@@ -23,7 +23,7 @@ using boost::asio::ip::tcp;
 
 //----------------------------------------------------------------------
 
-typedef std::deque<chat_message> chat_message_queue;
+typedef std::deque<std::shared_ptr<chat_message>> chat_message_queue;
 
 //----------------------------------------------------------------------
 
@@ -31,7 +31,7 @@ class chat_participant
 {
 public:
     virtual ~chat_participant() = default;
-    virtual void deliver(const std::string& recipient, const chat_message& msg) = 0;
+    virtual void deliver(const std::string& recipient, const std::shared_ptr<chat_message>& msg) = 0;
 };
 
 typedef std::shared_ptr<chat_participant> chat_participant_ptr;
@@ -62,7 +62,7 @@ public:
 
     }
 
-    void deliver(const std::string& recipient, const chat_message& msg)
+    void deliver(const std::string& recipient, const std::shared_ptr<chat_message>& msg)
     {
         if (participants_.find(recipient) != participants_.end()) {
             recent_msgs_.push_back(msg);
@@ -100,7 +100,7 @@ public:
 
     }
 
-    void deliver(const std::string& recipient, const chat_message& msg) override
+    void deliver(const std::string& recipient, const std::shared_ptr<chat_message>& msg) override
     {
         bool write_in_progress = !write_msgs_.empty();
         write_msgs_.push_back(msg);
@@ -121,11 +121,12 @@ public:
 
     void handle_username(boost::system::error_code, std::size_t size) {
         std::stringstream message;
-        //message << socket_.remote_endpoint(ec) << "> " << std::istream(&buf).rdbuf();
+
         message << std::istream(&buf).rdbuf();
         buf.consume(size);
         std::cout << message.str();
         std::string username = message.str();
+        message.clear();
         int pos = username.find('\n');
         username = username.substr(0,pos);
         room_.join(username, shared_from_this());
@@ -136,10 +137,10 @@ private:
     {
         auto self(shared_from_this());
         boost::asio::async_read(socket_,
-                                boost::asio::buffer(read_msg_.data(), chat_message::HEADER_SIZE),
+                                boost::asio::buffer(read_msg_->head(), chat_message::header_length),
                                 [this, self](boost::system::error_code ec, std::size_t /*length*/)
                                 {
-                                    if (!ec && read_msg_.decode_header())
+                                    if (!ec && read_msg_->decode_header())
                                     {
                                         do_read_body();
                                     }
@@ -154,14 +155,14 @@ private:
     {
         auto self(shared_from_this());
         boost::asio::async_read(socket_,
-                                boost::asio::buffer(read_msg_.body(), read_msg_.body_length()),
+                                boost::asio::buffer(read_msg_->data_.get() + chat_message::header_length, read_msg_->body_length()),
                                 [this, self](boost::system::error_code ec, std::size_t /*length*/)
                                 {
                                     if (!ec)
                                     {
-                                        std::string test = read_msg_.get_username();
-                                        std::string receiver = read_msg_.get_recipient();
-                                        room_.deliver(receiver, read_msg_);
+                                        std::string test = read_msg_->get_username();
+                                        //std::string receiver = read_msg_.get_recipient();
+                                        room_.deliver(test, read_msg_);
                                         do_read_header();
                                     }
                                     else
@@ -175,13 +176,12 @@ private:
     {
         auto self(shared_from_this());
         boost::asio::async_write(socket_,
-                                 boost::asio::buffer(write_msgs_.front().data(),
-                                                     write_msgs_.front().length()),
+                                 boost::asio::buffer(write_msgs_.front()->data_.get(),
+                                                     write_msgs_.front()->full_length()),
                                  [this, self](boost::system::error_code ec, std::size_t /*length*/)
                                  {
                                      if (!ec)
                                      {
-                                         std::cout.write(write_msgs_.front().data(), write_msgs_.front().length());
                                          write_msgs_.pop_front();
                                          if (!write_msgs_.empty())
                                          {
@@ -198,7 +198,8 @@ private:
 
     tcp::socket socket_;
     chat_room& room_;
-    chat_message read_msg_;
+    std::shared_ptr<chat_message> read_msg_ = std::make_shared<chat_message>();
+    //chat_message read_msg_;
     chat_message_queue write_msgs_;
     boost::asio::streambuf buf;
 };

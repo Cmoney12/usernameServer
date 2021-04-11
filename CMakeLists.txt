@@ -3,7 +3,7 @@ project(boostServerspecific)
 
 set(CMAKE_CXX_STANDARD 17)
 FIND_PACKAGE(Boost REQUIRED COMPONENTS system thread regex)
-#include("${CMAKE_SOURCE_DIR}/vendor/rapidjson.cmake")
+
 find_package(RapidJSON ${RAPIDJSON_REQUIRED_VERSION} QUIET REQUIRED)
 
 set(RapidJSON_LIBRARIES ${RapidJSON_LIBRARY})

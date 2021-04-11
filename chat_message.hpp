@@ -3,8 +3,6 @@
 //
 
 #include <iostream>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
@@ -12,123 +10,41 @@
 #ifndef BOOSTWRITEJSON_CHAT_MESSAGE_HPP
 #define BOOSTWRITEJSON_CHAT_MESSAGE_HPP
 
-namespace pt = boost::property_tree;
 
-class chat_message {
+class chat_message: public std::enable_shared_from_this<chat_message> {
 public:
-    enum {HEADER_SIZE = 4 };
+    enum { header_length = 4 };
+    enum {max_body_length = 9999 };
+    std::unique_ptr<char[]> data_;
 
-    chat_message(): body_length_(0)
+    chat_message()
+            : body_length_(0)
     {
     }
 
-    [[nodiscard]] const char* data() const
-    {
+    char* head() {
+        return header;
+    }
+
+    std::unique_ptr<char[]>& body() {
         return data_;
     }
 
-    char* data()
-    {
-        return data_;
+    std::size_t full_length() const {
+        return body_length_+ header_length;
     }
 
-    [[nodiscard]] std::size_t length() const
-    {
-        return HEADER_SIZE + body_length_;
-    }
 
-    [[nodiscard]] const char* body() const
-    {
-        return data_ + HEADER_SIZE;
-    }
-
-    char* body()
-    {
-        return data_ + HEADER_SIZE;
-    }
-
-    [[nodiscard]] std::size_t body_length() const
+    std::size_t body_length() const
     {
         return body_length_;
     }
 
-    void display_json() const {
-        pt::write_json(std::cout, root);
-    }
-
-    void body_length(std::size_t new_length)
-    {
-        body_length_ = new_length;
-        if (body_length_ > MAXIMUM_MESSAGE_SIZE)
-            body_length_ = MAXIMUM_MESSAGE_SIZE;
-    }
-
-
-    /**std::string write_json() {
-        std::ostringstream oss;
-        std::string message;
-        pt::write_json(oss, root);
-        body_length_ = oss.str().size();
-        if (body_length_ <= MAXIMUM_MESSAGE_SIZE) {
-            std::string str_size = std::to_string(body_length_);
-
-            if (str_size.length() < HEADER_SIZE) {
-                std::string zeros = (str_size.size() - HEADER_SIZE, "0");
-                str_size = zeros + str_size;
-                message = str_size + oss.str();
-            }
-        }
-        return message;
-    }**/
-
-    std::string get_username() {
-        std::string data_str(data_);
-        int pos = (data_str).find('{');
-        std::string json = data_str.substr(pos, body_length_);
-        std::string username;
-
-        rapidjson::Document json_doc;
-        json_doc.Parse(json.c_str());
-        rapidjson::Value& header = json_doc["Header"];
-        rapidjson::Value::ConstMemberIterator itr = header.FindMember("To");
-
-// assuming "command" is a String value
-        if (itr != header.MemberEnd())
-            printf("command = %s\n", itr->value.GetString());
-
-        //rapidjson::Value::ConstMemberIterator itr = json_doc.FindMember("hello");
-        //if (itr != json_doc.MemberEnd())
-        //     username = itr->value.GetString();
-        return username;
-    }
-
-    std::string get_recipient() {
-        std::string data_str(data_);
-        //data_str = data_str.substr(chat_message::HEADER_SIZE * 2, body_length_);
-        int pos = (data_str).find('{');
-        std::string json = data_str.substr(pos, body_length_);
-        std::cout << json << std::endl;
-
-        std::istringstream is(json);
-        pt::read_json(is, root);
-        is.clear();
-        recipient = root.get<std::string>("Header.To");
-        return recipient;
-    }
-
-    void read_json() {
-        std::istringstream is(data_);
-        pt::read_json(is, root);
-        std::cout << root.get<std::string>("Header.To") << std::endl;
-    }
-
-
-    bool decode_header()
-    {
-        char header[HEADER_SIZE + 1] = "";
-        std::strncat(header, data_, HEADER_SIZE);
+    bool decode_header() {
         body_length_ = std::atoi(header);
-        if (body_length_ > MAXIMUM_MESSAGE_SIZE)
+        data_ = std::make_unique<char[]>(full_length() + 1);
+        std::strncat(data_.get(), header, header_length);
+        if (body_length_ > max_body_length)
         {
             body_length_ = 0;
             return false;
@@ -136,20 +52,41 @@ public:
         return true;
     }
 
-    void create_tree(const std::string& receiver, const std::string& deliverer,
-                     const std::string& body ="") {
-        root.put("Header.To", receiver);
-        root.put("Header.From", deliverer);
-        //root.put("Header.Type", type_info);
-        root.put("Contents.Body", body);
+    std::string get_username() const {
+        std::cout << data_.get() << std::endl;
+        std::string username;
+
+        rapidjson::Document json_doc(rapidjson::kObjectType);
+        json_doc.Parse(data_.get() + header_length, body_length_);
+        //json_doc.Parse(json.c_str());
+        rapidjson::Value& head = json_doc["Header"];
+        head.IsObject();
+        rapidjson::Value::ConstMemberIterator itr = head.FindMember("To");
+        if (itr != head.MemberEnd())
+            username = itr->value.GetString();
+
+        head.RemoveAllMembers();
+
+        return username;
     }
+
+    /**std::string get_recipient() {
+        std::string data_str(data_);
+        //data_str = data_str.substr(chat_message::HEADER_SIZE * 2, body_length_);
+        int pos = (data_str).find('{');
+        std::string json = data_str.substr(pos, body_length_);
+
+        std::istringstream is(json);
+        pt::read_json(is, root);
+        is.clear();
+        recipient = root.get<std::string>("Header.To");
+        return recipient;
+    }**/
+
 
 private:
     std::size_t body_length_{};
-    enum { MAXIMUM_MESSAGE_SIZE = 700 };
-    pt::ptree root;
-    std::string recipient;
-    char data_[MAXIMUM_MESSAGE_SIZE + 4]{};
+    char header[header_length + 1]{};
 };
 
 
