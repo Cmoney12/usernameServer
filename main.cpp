@@ -1,13 +1,3 @@
-//
-// chat_server.cpp
-// ~~~~~~~~~~~~~~~
-//
-// Copyright (c) 2003-2019 Christopher M. Kohlhoff (chris at kohlhoff dot com)
-//
-// Distributed under the Boost Software License, Version 1.0. (See accompanying
-// file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
-//
-
 #include <cstdlib>
 #include <deque>
 #include <iostream>
@@ -160,9 +150,8 @@ private:
                                 {
                                     if (!ec)
                                     {
-                                        std::string test = read_msg_->get_username();
-                                        //std::string receiver = read_msg_.get_recipient();
-                                        room_.deliver(test, read_msg_);
+                                        std::string username = read_msg_->get_username();
+                                        room_.deliver(username, read_msg_);
                                         do_read_header();
                                     }
                                     else
@@ -199,7 +188,6 @@ private:
     tcp::socket socket_;
     chat_room& room_;
     std::shared_ptr<chat_message> read_msg_ = std::make_shared<chat_message>();
-    //chat_message read_msg_;
     chat_message_queue write_msgs_;
     boost::asio::streambuf buf;
 };

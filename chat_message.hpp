@@ -61,7 +61,7 @@ public:
         //json_doc.Parse(json.c_str());
         rapidjson::Value& head = json_doc["Header"];
         head.IsObject();
-        rapidjson::Value::ConstMemberIterator itr = head.FindMember("From");
+        rapidjson::Value::ConstMemberIterator itr = head.FindMember("To");
         if (itr != head.MemberEnd())
             username = itr->value.GetString();
 
@@ -69,19 +69,6 @@ public:
 
         return username;
     }
-
-    /**std::string get_recipient() {
-        std::string data_str(data_);
-        //data_str = data_str.substr(chat_message::HEADER_SIZE * 2, body_length_);
-        int pos = (data_str).find('{');
-        std::string json = data_str.substr(pos, body_length_);
-
-        std::istringstream is(json);
-        pt::read_json(is, root);
-        is.clear();
-        recipient = root.get<std::string>("Header.To");
-        return recipient;
-    }**/
 
 
 private:
