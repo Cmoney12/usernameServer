@@ -1,5 +1,5 @@
-## Servrer for vega messaging application
+# Servrer for vega messaging application
 
-# client
+## client
 
 https://github.com/Cmoney12/ClientChatApp
