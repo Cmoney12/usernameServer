@@ -13,8 +13,8 @@
 
 class chat_message: public std::enable_shared_from_this<chat_message> {
 public:
-    enum { header_length = 4 };
-    enum {max_body_length = 9999 };
+    enum { header_length = 5 };
+    enum {max_body_length = 99999 };
     std::unique_ptr<char[]> data_;
 
     chat_message()
@@ -55,7 +55,6 @@ public:
     std::string get_username() const {
         std::cout << data_.get() << std::endl;
         std::string username;
-
         rapidjson::Document json_doc(rapidjson::kObjectType);
         json_doc.Parse(data_.get() + header_length, body_length_);
         //json_doc.Parse(json.c_str());
