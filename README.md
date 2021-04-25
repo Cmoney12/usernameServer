@@ -1,4 +1,4 @@
-# Servrer for vega messaging application
+# Server for vega messaging application
 
 ## client
 
